@@ -47,6 +47,17 @@ table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nu
 th { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 9px 7px; border-bottom: 1px solid var(--line); }
 th:first-child, td:first-child { text-align: left; padding-left: 12px; }
 th:last-child, td:last-child { padding-right: 12px; }
+.h { position: relative; cursor: help; border-bottom: 1px dotted var(--muted); outline: none; }
+.h:focus-visible { color: var(--accent); }
+.h::after {
+  content: attr(data-tip); display: none; position: absolute; top: calc(100% + 8px); left: 0; z-index: 5;
+  width: max-content; max-width: 190px; padding: 8px 10px; border-radius: 8px;
+  background: var(--fg); color: var(--bg); box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  font-family: var(--font-body); font-size: 12.5px; font-weight: 500; line-height: 1.35;
+  letter-spacing: normal; text-transform: none; text-align: left; white-space: normal;
+}
+th:nth-last-child(-n+5) .h::after { left: auto; right: -4px; }
+.h:hover::after, .h:focus::after { display: block; }
 td { padding: 10px 7px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 tbody tr { cursor: pointer; }
@@ -90,7 +101,17 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
     <h2 id="standTitle">Standings</h2>
     <div class="panel scroll">
       <table>
-        <thead><tr><th>Team</th><th>W</th><th>L</th><th>T</th><th>GP</th><th>Pts</th><th>Pct</th><th>PF</th><th>PA</th></tr></thead>
+        <thead><tr>
+          <th><span class="h" tabindex="0" data-tip="Tap a team name to see all of its games.">Team</span></th>
+          <th><span class="h" tabindex="0" data-tip="Wins">W</span></th>
+          <th><span class="h" tabindex="0" data-tip="Losses (forfeits count as losses)">L</span></th>
+          <th><span class="h" tabindex="0" data-tip="Ties">T</span></th>
+          <th><span class="h" tabindex="0" data-tip="Games played">GP</span></th>
+          <th><span class="h" tabindex="0" data-tip="Standings points: 2 for a win, 1 for a tie, minus any forfeit penalties">Pts</span></th>
+          <th><span class="h" tabindex="0" data-tip="Percentage of potential points: points earned divided by points possible (2 per game played). Teams are ranked by this.">Pct</span></th>
+          <th><span class="h" tabindex="0" data-tip="Points for: total points scored">PF</span></th>
+          <th><span class="h" tabindex="0" data-tip="Points against: total points allowed">PA</span></th>
+        </tr></thead>
         <tbody id="standings"></tbody>
       </table>
     </div>
@@ -226,7 +247,7 @@ function renderStandings() {
       <td><span class="rank">${i+1}</span><span class="team">${esc(r.k)}</span>${r.adj ? `<span class="mark">*</span>` : ""}${r.coin ? `<span class="mark">†</span>` : ""}</td>
       <td>${r.w}</td><td>${r.l}</td><td>${r.tie}</td><td>${r.gp}</td><td>${r.pts}</td>
       <td class="pts">${pctText(r.pct)}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`).join("");
-  const notes = ["2 points for a win, 1 for a tie. Teams are ranked by Pct, the share of possible points earned, because some teams have played more games. Tap a team to see its games."];
+  const notes = ["Tap any column heading for what it means. Teams are ranked by Pct (percentage of potential points), because some teams have played more games than others. Tap a team to see its games."];
   if (rows.some(r => r.coin)) notes.push("† Tied, and head-to-head doesn't break it. Seeding is decided by coin flip.");
   if (NON_COMPETITIVE.includes(div)) notes.push(`${esc(div)} is non-competitive, so forfeit penalties don't apply.`);
   for (const r of rows.filter(r => r.adj)) notes.push(`* ${esc(r.k)}: ${r.adj > 0 ? "+" : ""}${r.adj} point${Math.abs(r.adj) === 1 ? "" : "s"}.${r.reasons.length ? " " + esc(r.reasons.join("; ")).replace(/\.?$/, ".") : ""}`);
