@@ -1,1 +1,271 @@
-<h1>RISMA Standings coming soon</h1>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RISMA Standings</title>
+<meta name="description" content="RISMA Pop Warner football standings and scores, updated from the conference score sheet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Public+Sans:wght@400;500;600&display=swap">
+<style>
+:root {
+  --bg: #f5f4f8; --surface: #ffffff; --fg: #1d1925; --muted: #6a6478; --line: #e3e0ea;
+  --accent: #5b2d92; --accent-soft: #efe8f8; --on-accent: #ffffff; --warn-bg: #fff4dc; --warn-fg: #6b4a00;
+  --font-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131117; --surface: #1c1922; --fg: #ece9f2; --muted: #a29bb0; --line: #2e2a37;
+    --accent: #b591ef; --accent-soft: #2a2238; --on-accent: #16121c; --warn-bg: #3a2f14; --warn-fg: #f3d58a;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.45; }
+.wrap {
+  max-width: 600px; margin: 0 auto; padding-block: 20px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 22px;
+}
+.wrap > * { min-width: 0; }
+header { display: grid; gap: 4px; }
+.eyebrow { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 34px; line-height: 1; margin: 0; }
+.updated { color: var(--muted); font-size: 13px; }
+.banner { background: var(--warn-bg); color: var(--warn-fg); border-radius: 10px; padding: 10px 14px; font-size: 13.5px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab { font-family: var(--font-display); font-weight: 600; font-size: 17px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); border-radius: 999px; padding: 6px 15px; cursor: pointer; white-space: nowrap; }
+.tab[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 8px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { font-family: var(--font-display); font-weight: 600; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: right; padding: 9px 7px; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; padding-left: 12px; }
+th:last-child, td:last-child { padding-right: 12px; }
+td { padding: 10px 7px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+tbody tr { cursor: pointer; }
+tbody tr:hover td, tbody tr.sel td { background: var(--accent-soft); }
+tbody tr:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rank { color: var(--muted); display: inline-block; width: 1.5em; }
+.team { font-weight: 600; }
+.mark { color: var(--accent); font-weight: 700; margin-left: 2px; }
+td.pts { font-family: var(--font-display); font-weight: 700; font-size: 18px; color: var(--accent); }
+.notes { display: grid; gap: 4px; margin: 8px 2px 0; }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.weeks { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.wk { font-size: 15px; padding: 4px 11px; }
+.games { display: grid; gap: 8px; }
+.game { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; display: grid; grid-template-columns: 1fr auto; row-gap: 4px; padding: 10px 14px; }
+.game .wkl { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.side { display: contents; }
+.side .nm { min-width: 0; }
+.side .sc { font-family: var(--font-display); font-weight: 700; font-size: 20px; text-align: right; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.side.win .nm { font-weight: 600; }
+.side.lose .nm, .side.lose .sc { color: var(--muted); }
+.tag { grid-column: 1 / -1; font-size: 12px; color: var(--accent); font-weight: 600; }
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 14px; color: var(--muted); }
+.filter { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.filter h2 { margin: 0; }
+.clear { background: none; border: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; padding: 4px; }
+.clear:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">RISMA Pop Warner · 2026 Football</div>
+    <h1>Standings &amp; Scores</h1>
+    <div class="updated" id="updated">Loading scores…</div>
+  </header>
+  <div class="banner" id="banner" hidden></div>
+  <div class="tabs" id="divs" role="group" aria-label="Division"></div>
+  <section>
+    <h2 id="standTitle">Standings</h2>
+    <div class="panel scroll">
+      <table>
+        <thead><tr><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>GP</th><th>PF</th><th>PA</th></tr></thead>
+        <tbody id="standings"></tbody>
+      </table>
+    </div>
+    <div class="notes" id="notes"></div>
+  </section>
+  <section>
+    <div class="filter">
+      <h2 id="resultsTitle">Results</h2>
+      <button class="clear" id="clearTeam" hidden>Show all teams</button>
+    </div>
+    <div class="weeks" id="weeks" role="group" aria-label="Week"></div>
+    <div class="games" id="games"></div>
+  </section>
+  <footer>Scores come straight from the RISMA score sheet. Records, points and order are calculated automatically.</footer>
+</div>
+
+<script>
+/* ===== Settings ===== */
+// Paste the "Publish to web" CSV links for each tab here.
+const SCORES_CSV = "";
+const ADJUSTMENTS_CSV = "";
+// Teams that are not RISMA members. Their games count for the RISMA team but they get no standings row.
+const NON_MEMBERS = ["Mt. Hope"];
+const DIV_ORDER = ["6U", "8U", "10U", "12U", "13U", "14U"];
+/* Backup copy shown if the sheet can't be reached */
+const FALLBACK = {"Scores": "Week,Division,Team 1,Score 1,Team 2,Score 2,Forfeit by,Notes\n1,6U,Dighton-Rehoboth,1,East Bay,4,,\n1,6U,East Providence,4,Edgewood,5,,\n1,6U,New Bedford,5,Middletown,4,,\n1,6U,Seekonk,2,Dartmouth,5,,\n1,8U,Dighton-Rehoboth,12,East Bay,7,,\n1,8U,East Providence,7,Edgewood,33,,\n1,8U,New Bedford,12,Middletown,0,,\n1,8U,Seekonk,25,Dartmouth,6,,\n1,8U,Wareham,18,Fairhaven,6,,\n1,10U,Dighton-Rehoboth,12,East Bay,13,,\n1,10U,East Providence,33,Edgewood,0,,\n1,10U,New Bedford,0,Middletown,6,,\n1,10U,Seekonk,0,Dartmouth,19,,\n1,10U,Wareham,24,Fairhaven,6,,\n1,12U,Dighton-Rehoboth,0,East Bay,30,,\n1,12U,East Providence,12,Edgewood,26,,\n1,12U,New Bedford,0,Middletown,33,,\n1,12U,Seekonk,0,Dartmouth,32,,\n1,12U,Wareham,38,Fairhaven,14,,\n1,12U,Old Rochester,32,Barrington,0,,\n1,13U,Dighton-Rehoboth,30,East Bay,7,,\n1,13U,East Providence,18,Edgewood,39,,\n1,13U,Seekonk,0,Dartmouth,14,,\n2,6U,East Bay,1,Seekonk,4,,\n2,6U,Dartmouth,4,Dighton-Rehoboth,1,,\n2,6U,Middletown,5,Wareham,1,,\n2,6U,Edgewood,5,New Bedford,5,,\n2,8U,Fairhaven,6,East Providence,26,,\n2,8U,Dartmouth,26,Dighton-Rehoboth,19,,\n2,8U,Middletown,9,Wareham,20,,\n2,8U,Edgewood,33,New Bedford,6,,\n2,8U,East Bay,6,Seekonk,31,,\n2,10U,Fairhaven,0,East Providence,30,,\n2,10U,Dartmouth,40,Dighton-Rehoboth,0,,\n2,10U,Middletown,0,Wareham,13,,\n2,10U,Edgewood,13,New Bedford,6,,\n2,10U,East Bay,0,Seekonk,34,,\n2,12U,Barrington,6,East Providence,33,,\n2,12U,Dartmouth,34,Dighton-Rehoboth,0,,\n2,12U,Middletown,35,Wareham,0,,\n2,12U,Edgewood,12,New Bedford,18,,\n2,12U,Fairhaven,7,Old Rochester,26,,\n2,12U,East Bay,33,Seekonk,0,,\n2,13U,Barrington,0,East Providence,34,,\n2,13U,East Bay,24,Seekonk,0,,\n2,13U,Dartmouth,6,Dighton-Rehoboth,22,,\n3,6U,New Bedford,4,Seekonk,4,,\n3,6U,Dighton-Rehoboth,2,Edgewood,5,,\n3,6U,East Bay,3,East Providence,4,,\n3,6U,Dartmouth,5,Wareham,0,,\n3,8U,New Bedford,6,Seekonk,36,,\n3,8U,Dighton-Rehoboth,0,Edgewood,35,,\n3,8U,East Bay,0,East Providence,26,,\n3,8U,Dartmouth,24,Wareham,26,,\n3,8U,Fairhaven,12,Middletown,7,,\n3,10U,New Bedford,0,Seekonk,33,,\n3,10U,Dartmouth,34,Wareham,0,,\n3,10U,Fairhaven,32,Middletown,7,,\n3,12U,New Bedford,32,Seekonk,0,,\n3,12U,Old Rochester,26,Barrington,0,,\n3,12U,Dartmouth,40,Wareham,6,,\n3,12U,Fairhaven,0,Middletown,33,,\n3,13U,,,,,,Rained out\n4,6U,East Bay,5,Wareham,1,,\n4,6U,Dartmouth,7,East Providence,3,,\n4,6U,Middletown,6,Edgewood,6,,\n4,6U,Dighton-Rehoboth,1,Seekonk,5,,\n4,8U,Wareham,13,East Bay,14,,\n4,8U,East Providence,6,Dartmouth,34,,\n4,8U,New Bedford,14,Fairhaven,7,,\n4,8U,Edgewood,30,Middletown,0,,\n4,8U,Seekonk,25,Dighton-Rehoboth,0,,\n4,10U,Wareham,19,East Bay,0,,\n4,10U,East Providence,6,Dartmouth,27,,\n4,10U,New Bedford,19,Fairhaven,19,,\n4,10U,Edgewood,33,Middletown,0,,\n4,10U,Seekonk,41,Dighton-Rehoboth,0,,\n4,12U,Wareham,0,East Bay,32,,\n4,12U,East Providence,0,Dartmouth,13,,\n4,12U,New Bedford,0,Old Rochester,6,,\n4,12U,Barrington,0,Fairhaven,6,,\n4,12U,Seekonk,19,Dighton-Rehoboth,18,,\n4,12U,Edgewood,6,Middletown,33,,\n4,13U,Edgewood,19,Mt. Hope,8,,Non-conference game\n4,13U,Barrington,8,East Bay,27,,\n4,13U,East Providence,21,Dartmouth,0,,\n4,13U,Seekonk,0,Dighton-Rehoboth,34,,\n5,6U,Middletown,5,East Providence,6,,\n5,8U,Seekonk,0,Edgewood,31,,\n5,10U,Seekonk,20,Edgewood,0,,\n5,10U,Middletown,21,East Providence,44,,\n5,12U,Seekonk,13,Edgewood,33,,\n5,12U,Middletown,27,East Providence,6,,\n5,13U,Seekonk,6,Edgewood,33,,\n5,13U,Barrington,6,Dartmouth,20,,\n6,6U,Dartmouth,6,Edgewood,5,,\n6,6U,Wareham,0,New Bedford,4,,\n6,6U,Middletown,6,Dighton-Rehoboth,4,,\n6,6U,East Providence,0,Seekonk,6,,\n6,8U,Dartmouth,14,Edgewood,32,,\n6,8U,Fairhaven,6,East Bay,14,,\n6,8U,Middletown,6,Dighton-Rehoboth,7,,\n6,8U,East Providence,7,Seekonk,19,,\n6,8U,Wareham,6,New Bedford,18,,\n6,10U,Dartmouth,30,Edgewood,0,,\n6,10U,Fairhaven,26,East Bay,14,,\n6,10U,Middletown,18,Dighton-Rehoboth,0,,\n6,10U,East Providence,7,Seekonk,33,,\n6,10U,Wareham,25,New Bedford,0,,\n6,12U,Dartmouth,30,Edgewood,6,,\n6,12U,Fairhaven,6,East Bay,26,,\n6,12U,Middletown,20,Old Rochester,6,,\n6,12U,East Providence,21,Seekonk,0,,\n6,12U,Dighton-Rehoboth,24,Barrington,19,,\n6,12U,Wareham,7,New Bedford,26,,\n6,13U,Dartmouth,6,Edgewood,40,,\n6,13U,East Providence,38,Seekonk,6,,\n6,13U,Dighton-Rehoboth,32,Barrington,26,,\n7,6U,East Bay,2,Dartmouth,4,,\n7,6U,Dighton-Rehoboth,2,East Providence,6,,\n7,6U,New Bedford,7,Middletown,2,,\n7,6U,Seekonk,6,Wareham,1,,\n7,8U,East Bay,7,Dartmouth,25,,\n7,8U,Dighton-Rehoboth,6,East Providence,19,,\n7,8U,Seekonk,42,Wareham,14,,\n7,8U,Edgewood,43,Fairhaven,0,,\n7,8U,New Bedford,32,Middletown,0,,\n7,10U,East Bay,0,Dartmouth,36,,\n7,10U,Seekonk,14,Wareham,12,,\n7,10U,Dighton-Rehoboth,7,East Providence,33,,\n7,10U,Edgewood,38,Fairhaven,39,,\n7,10U,New Bedford,20,Middletown,0,,\n7,12U,East Bay,20,Dartmouth,14,,\n7,12U,Seekonk,0,Wareham,25,,\n7,12U,New Bedford,13,Barrington,0,,\n7,12U,Edgewood,32,Fairhaven,6,,\n7,12U,Dighton-Rehoboth,0,East Providence,42,,\n7,12U,Old Rochester,18,Middletown,47,,\n7,13U,East Bay,12,Dartmouth,0,,\n7,13U,Dighton-Rehoboth,22,East Providence,26,,\n7,13U,Edgewood,2,Barrington,0,,\n8,6U,Edgewood,3,East Bay,3,,\n8,6U,East Providence,4,Wareham,0,,\n8,6U,Dartmouth,2,New Bedford,4,,\n8,6U,Middletown,2,Seekonk,6,,\n8,6U,Dighton-Rehoboth,,,,,Bye\n8,8U,Edgewood,41,East Bay,0,,\n8,8U,Fairhaven,0,Dighton-Rehoboth,19,,\n8,8U,East Providence,13,Wareham,7,,\n8,8U,Dartmouth,35,New Bedford,0,,\n8,8U,Middletown,0,Seekonk,6,Middletown,\n8,10U,Edgewood,19,East Bay,0,,\n8,10U,Fairhaven,33,Dighton-Rehoboth,6,,\n8,10U,East Providence,18,Wareham,43,,\n8,10U,Dartmouth,24,New Bedford,0,,\n8,10U,Middletown,0,Seekonk,41,,\n8,12U,Edgewood,6,East Bay,12,,\n8,12U,East Providence,31,Wareham,14,,\n8,12U,Middletown,6,Seekonk,0,Seekonk,\n8,12U,Old Rochester,34,Dighton-Rehoboth,6,,\n8,12U,Dartmouth,6,New Bedford,27,,\n8,12U,Fairhaven,6,Barrington,29,,\n8,13U,Barrington,20,Seekonk,49,,\n8,13U,Edgewood,30,East Bay,0,,\n8,13U,Dartmouth,0,Dighton-Rehoboth,30,,\n", "Adjustments": "Division,Team,Points,Reason\n6U,Middletown,-1,Carried over from the Week 7 standings (reason to be confirmed)\n8U,Middletown,-1,Carried over from the Week 7 standings (reason to be confirmed)\n10U,Middletown,-1,Carried over from the Week 7 standings (reason to be confirmed)\n12U,Middletown,-1,Carried over from the Week 7 standings (reason to be confirmed)\n12U,Barrington,-1,Carried over from the Week 7 standings (reason to be confirmed)\n13U,Barrington,-1,Carried over from the Week 7 standings (reason to be confirmed)\n"};
+const FALLBACK_DATE = "October 21, 2026";
+/* ==================== */
+
+function parseCSV(text) {
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i+1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i+1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
+  return rows.filter(r => r.some(v => v.trim() !== "")).map(r => Object.fromEntries(head.map((h, i) => [h, (r[i] || "").trim()])));
+}
+const num = v => v === "" || v == null || isNaN(+v) ? null : +v;
+
+function build(scoresText, adjText) {
+  const games = {}, byes = {}, weekNotes = {}, adj = {};
+  const add = (o, d) => (o[d] ??= []);
+  for (const r of parseCSV(scoresText)) {
+    const d = r["division"], w = num(r["week"]);
+    if (!d || w == null) continue;
+    const a = r["team 1"], b = r["team 2"], sa = num(r["score 1"]), sb = num(r["score 2"]), note = r["notes"] || "";
+    if (a && b && sa != null && sb != null) add(games, d).push({ w, a, sa, b, sb, ff: r["forfeit by"] || "" });
+    else if (/^bye$/i.test(note) && a) ((byes[d] ??= {})[w] ??= []).push(a);
+    else if (note) ((weekNotes[d] ??= {})[w] ??= []).push(note);
+  }
+  for (const r of parseCSV(adjText || "")) {
+    const d = r["division"], t = r["team"], p = num(r["points"]);
+    if (!d || !t || p == null) continue;
+    const k = d + "|" + t; adj[k] ??= { pts: 0, reasons: [] }; adj[k].pts += p; if (r["reason"]) adj[k].reasons.push(r["reason"]);
+  }
+  const divs = Object.keys(games).sort((x, y) => {
+    const ix = DIV_ORDER.indexOf(x), iy = DIV_ORDER.indexOf(y);
+    return (ix < 0 ? 99 : ix) - (iy < 0 ? 99 : iy) || x.localeCompare(y, undefined, { numeric: true });
+  });
+  return { games, byes, weekNotes, adj, divs };
+}
+
+let D, div, week, team = null, lastWeek = 1;
+
+function standings(d) {
+  const t = {}, row = k => (t[k] ??= { k, w:0, l:0, tie:0, pf:0, pa:0 });
+  for (const g of D.games[d]) for (const [x, s, o] of [[g.a, g.sa, g.sb], [g.b, g.sb, g.sa]]) {
+    if (NON_MEMBERS.includes(x)) continue;
+    const r = row(x); r.pf += s; r.pa += o;
+    if (s > o) r.w++; else if (s < o) r.l++; else r.tie++;
+  }
+  return Object.values(t).map(r => {
+    const a = D.adj[d + "|" + r.k];
+    return { ...r, adj: a ? a.pts : 0, reasons: a ? a.reasons : [], gp: r.w + r.l + r.tie, pts: 2*r.w + r.tie + (a ? a.pts : 0) };
+  }).sort((x, y) => y.pts - x.pts || x.l - y.l || x.k.localeCompare(y.k));
+}
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+
+function renderTabs() {
+  document.getElementById("divs").innerHTML = D.divs.map(d =>
+    `<button class="tab" data-d="${esc(d)}" aria-pressed="${d === div}">${esc(d)}</button>`).join("");
+}
+function renderStandings() {
+  const rows = standings(div);
+  document.getElementById("standTitle").textContent = `${div} Standings`;
+  document.getElementById("standings").innerHTML = rows.map((r, i) =>
+    `<tr data-k="${esc(r.k)}" class="${team === r.k ? "sel" : ""}" tabindex="0">
+      <td><span class="rank">${i+1}</span><span class="team">${esc(r.k)}</span>${r.adj ? `<span class="mark">*</span>` : ""}</td>
+      <td>${r.w}</td><td>${r.l}</td><td>${r.tie}</td><td class="pts">${r.pts}</td>
+      <td>${r.gp}</td><td>${r.pf}</td><td>${r.pa}</td></tr>`).join("");
+  const notes = ["2 points for a win, 1 for a tie. Tap a team to see its games."];
+  for (const r of rows.filter(r => r.adj)) notes.push(`* ${esc(r.k)}: ${r.adj > 0 ? "+" : ""}${r.adj} point${Math.abs(r.adj) === 1 ? "" : "s"}.${r.reasons.length ? " " + esc(r.reasons.join("; ")).replace(/\.?$/, ".") : ""}`);
+  if (D.games[div].some(g => g.ff)) notes.push("Forfeits are marked on the game and count as a loss for the team that forfeited.");
+  if (D.games[div].some(g => NON_MEMBERS.includes(g.a) || NON_MEMBERS.includes(g.b))) notes.push("Games against non-conference opponents count toward the conference team's record.");
+  document.getElementById("notes").innerHTML = notes.map(n => `<p class="note">${n}</p>`).join("");
+}
+function side(k, s, o) {
+  const cls = s > o ? "win" : s < o ? "lose" : "";
+  return `<div class="side ${cls}"><span class="nm">${esc(k)}</span><span class="sc">${s}</span></div>`;
+}
+function renderGames() {
+  const wk = document.getElementById("weeks"), all = D.games[div];
+  const list = team ? all.filter(g => g.a === team || g.b === team) : all.filter(g => g.w === week);
+  wk.hidden = !!team;
+  document.getElementById("clearTeam").hidden = !team;
+  document.getElementById("resultsTitle").textContent = team ? `${team} ${div} Games` : `${div} Week ${week}`;
+  if (!team) wk.innerHTML = Array.from({ length: lastWeek }, (_, i) =>
+    `<button class="tab wk" data-w="${i+1}" aria-pressed="${i+1 === week}">Wk ${i+1}</button>`).join("");
+  const notes = !team ? D.weekNotes[div]?.[week] : null, byes = !team ? D.byes[div]?.[week] : null;
+  const html = list.map(g => `<div class="game">${team ? `<span class="wkl">Week ${g.w}</span>` : ""}
+      ${side(g.a, g.sa, g.sb)}${side(g.b, g.sb, g.sa)}
+      ${g.sa === g.sb ? `<span class="tag">Tie</span>` : ""}
+      ${g.ff ? `<span class="tag">${esc(g.ff)} forfeit</span>` : ""}
+      ${NON_MEMBERS.includes(g.a) || NON_MEMBERS.includes(g.b) ? `<span class="tag">Non-conference opponent</span>` : ""}</div>`).join("")
+    || `<div class="empty">${notes ? `Week ${week}: ${esc(notes.join("; "))}.` : "No games this week."}</div>`;
+  document.getElementById("games").innerHTML = html + (byes ? `<p class="note">Bye: ${byes.map(esc).join(", ")}</p>` : "");
+}
+function renderAll() { renderTabs(); renderStandings(); renderGames(); }
+
+function start(scoresText, adjText, label) {
+  D = build(scoresText, adjText);
+  if (!D.divs.length) { document.getElementById("updated").textContent = "No scores yet."; return; }
+  lastWeek = Math.max(...D.divs.flatMap(d => D.games[d].map(g => g.w)));
+  week = lastWeek;
+  let saved = null; try { saved = localStorage.getItem("risma-div"); } catch (e) {}
+  div = D.divs.includes(saved) ? saved : D.divs[0];
+  const total = D.divs.reduce((n, d) => n + D.games[d].length, 0);
+  document.getElementById("updated").textContent = `Through Week ${lastWeek} · ${total} games across ${D.divs.length} divisions${label ? " · " + label : ""}`;
+  renderAll();
+}
+
+async function load() {
+  if (SCORES_CSV) {
+    try {
+      const bust = (u) => u + (u.includes("?") ? "&" : "?") + "t=" + Date.now();
+      const [s, a] = await Promise.all([
+        fetch(bust(SCORES_CSV), { cache: "no-store" }).then(r => { if (!r.ok) throw r.status; return r.text(); }),
+        ADJUSTMENTS_CSV ? fetch(bust(ADJUSTMENTS_CSV), { cache: "no-store" }).then(r => r.ok ? r.text() : "").catch(() => "") : Promise.resolve("")
+      ]);
+      start(s, a, "");
+      return;
+    } catch (e) {
+      const b = document.getElementById("banner");
+      b.textContent = `Couldn't reach the score sheet just now, so this shows the saved copy from ${FALLBACK_DATE}. Refresh to try again.`;
+      b.hidden = false;
+    }
+  }
+  if (FALLBACK) start(FALLBACK.Scores, FALLBACK.Adjustments, SCORES_CSV ? "" : "saved copy");
+}
+
+document.getElementById("divs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  div = b.dataset.d; team = null;
+  try { localStorage.setItem("risma-div", div); } catch (err) {}
+  renderAll();
+});
+document.getElementById("standings").addEventListener("click", e => {
+  const tr = e.target.closest("tr"); if (!tr) return;
+  team = team === tr.dataset.k ? null : tr.dataset.k; renderStandings(); renderGames();
+});
+document.getElementById("standings").addEventListener("keydown", e => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.target.closest("tr")?.click(); }
+});
+document.getElementById("weeks").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; week = +b.dataset.w; renderGames();
+});
+document.getElementById("clearTeam").addEventListener("click", () => { team = null; renderStandings(); renderGames(); });
+load();
+</script>
+</body>
+</html>
