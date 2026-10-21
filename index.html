@@ -206,9 +206,9 @@ footer { color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--lin
 <script>
 /* ===== Settings ===== */
 // Paste the "Publish to web" CSV links for each tab here.
-const SCORES_CSV = "";
-const ADJUSTMENTS_CSV = "";
-const SEEDS_CSV = "";
+const SCORES_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSA4w1w1Kp4znLB4vXW29dcf8FhMSEU0ZEHwSCvBUtxpXnHBSPnwHh4z1NKLBP4Tk6y2ZZNufKmSmvN/pub?gid=961213480&single=true&output=csv";
+const ADJUSTMENTS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSA4w1w1Kp4znLB4vXW29dcf8FhMSEU0ZEHwSCvBUtxpXnHBSPnwHh4z1NKLBP4Tk6y2ZZNufKmSmvN/pub?gid=927064909&single=true&output=csv";
+const SEEDS_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSA4w1w1Kp4znLB4vXW29dcf8FhMSEU0ZEHwSCvBUtxpXnHBSPnwHh4z1NKLBP4Tk6y2ZZNufKmSmvN/pub?gid=1670446849&single=true&output=csv";
 // Playoffs: games entered on the Scores tab with these week numbers are playoff games.
 const ROUNDS = { 9: "First round", 10: "Semifinals", 11: "Super Bowl" };
 const ROUND_DATES = { 9: "Sat, Oct 24", 10: "Sun, Nov 1", 11: "Sun, Nov 8 (tentative) · Location to be announced" };
@@ -417,12 +417,17 @@ function seedsFor(d) {
 }
 function bracket(d) {
   const S = seedsFor(d), rows = D.playoffs[d] || [];
-  const find = (w, x, y) => rows.find(g => g.w === w && ((g.a === x && g.b === y) || (g.a === y && g.b === x)));
-  const findTBD = (w, x) => rows.find(g => g.w === w && ((g.a === x && g.b === "TBD") || (g.b === x && g.a === "TBD")));
+  const pair = (g, x, y) => (g.a === x && g.b === y) || (g.a === y && g.b === x);
   const match = (w, p, q) => {
     const [home, away] = (p.seed ?? 99) <= (q.seed ?? 99) ? [p, q] : [q, p];
-    const g = (home.team && away.team ? find(w, home.team, away.team) : null)
-            ?? (home.team ? findTBD(w, home.team) : null) ?? (away.team ? findTBD(w, away.team) : null);
+    // A game can have a schedule row (time and field, no score) plus a separate row with the final score,
+    // e.g. one entered through the form. Use the latest row with a score, and keep the schedule's note.
+    const exact = home.team && away.team ? rows.filter(g => g.w === w && pair(g, home.team, away.team)) : [];
+    const tbd = rows.filter(g => g.w === w && ((home.team && pair(g, home.team, "TBD")) || (away.team && pair(g, away.team, "TBD"))));
+    const all = exact.concat(tbd);
+    const scored = exact.filter(g => g.sa != null && g.sb != null);
+    let g = scored[scored.length - 1] || exact[0] || tbd[0];
+    if (g && !g.note) g = { ...g, note: (all.find(x => x.note) || {}).note || "" };
     let hs = null, as = null, win = null;
     if (g && home.team && away.team && g.sa != null && g.sb != null) {
       hs = g.a === home.team ? g.sa : g.sb; as = g.a === home.team ? g.sb : g.sa;
@@ -589,7 +594,14 @@ async function load() {
         fetch(bust(SCORES_CSV), { cache: "no-store" }).then(r => { if (!r.ok) throw r.status; return r.text(); }),
         opt(ADJUSTMENTS_CSV), opt(SEEDS_CSV)
       ]);
-      start(s, a, "", sd);
+      // Safety check: each link must point at the right tab. A wrong or broken link falls back to the saved copy.
+      const head = t => (t || "").split(/\r?\n/)[0].toLowerCase();
+      const has = (t, cols) => cols.every(c => head(t).includes(c));
+      if (!has(s, ["week", "division", "team 1", "score 1"])) throw "Scores link is not the Scores tab";
+      const a2 = has(a, ["division", "team", "points"]) ? a : (FALLBACK ? FALLBACK.Adjustments : "");
+      const sd2 = has(sd, ["division", "seed", "team"]) ? sd : (FALLBACK ? FALLBACK.Seeds : "");
+      if (!build(s, a2, sd2).divs.length) throw "Scores tab came back empty";
+      start(s, a2, "", sd2);
       return;
     } catch (e) {
       const b = document.getElementById("banner");
