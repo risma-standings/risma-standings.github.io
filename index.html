@@ -232,16 +232,18 @@ let ROUND_EXTRAS = { 10: "6U Bowl: Sun 11/1 · 9:00–11:00 AM · at Dartmouth" 
 let SEED_NOTES = {
   "8U": "#3 to #5: Dartmouth, New Bedford and East Providence tied at .571, and the conference set the order by coin flip. #6: Dighton-Rehoboth and Wareham tied for the last spot, and Wareham won the play-in game 31-12 on Wed 10/21.",
   "12U": "#3 to #5: Dartmouth, Old Rochester and New Bedford tied at .714. Old Rochester and Dartmouth never played each other, so head-to-head can't settle it, and the conference set the order by coin flip.",
-  "13U": "Projected until the make-up game, East Providence at East Bay on Sat 10/24. An East Providence win makes Edgewood #3 and East Bay #4; an East Bay win makes East Bay #3 and Edgewood #4. #1 East Providence, #2 Dighton-Rehoboth and #5 Dartmouth are set either way." };
+  "13U": "" };
 // Notes shown under each division's standings.
 let STANDINGS_NOTES = {
   "6U": "6U is non-competitive: no playoff bracket and no forfeit penalties. The 6U Bowl is Sun 11/1, 9:00 to 11:00 AM at Dartmouth.",
   "8U": "Dartmouth, New Bedford and East Providence finished tied at .571. Not all three played each other, so the conference set the order by coin flip: Dartmouth #3, New Bedford #4, East Providence #5. Dighton-Rehoboth and Wareham tied at .429 for the last playoff spot, and Wareham won the play-in game 31-12.",
   "10U": "No ties among the top six. Seeds follow the standings: Dartmouth, Seekonk, Wareham, Fairhaven, East Providence, Edgewood.",
   "12U": "Dartmouth, Old Rochester and New Bedford finished tied at .714. Old Rochester and Dartmouth never played each other, so the conference set the order by coin flip: Dartmouth #3, Old Rochester #4, New Bedford #5.",
-  "13U": "The conference now counts the Week 6 Dartmouth-Edgewood game as played (Edgewood 40, Dartmouth 6), and the top 5 make the playoffs. One game left: East Providence at East Bay, Sat 10/24, 6:30 PM (make-up of the Week 3 rainout). If East Providence wins, Edgewood is #3 and East Bay #4, because Edgewood beat East Bay. If East Bay wins, East Bay is #3 and Edgewood #4." };
+  "13U": "The conference now counts the Week 6 Dartmouth-Edgewood game as played (Edgewood 40, Dartmouth 6). One game left: East Providence at East Bay, Sat 10/24, 6:30 PM (make-up of the Week 3 rainout)." };
 // How many teams make the playoffs (used only until seeds are entered on the Seeds tab).
 let PLAYOFF_TEAMS = { "13U": 5, default: 6 };
+// Divisions whose playoff page just says "to be announced" for now.
+let PLAYOFF_TBA = ["13U"];
 let START_VIEW = "playoffs";   // "season" or "playoffs"
 // Teams that are not RISMA members. Their games count for the RISMA team but they get no standings row.
 const NON_MEMBERS = ["Mt. Hope"];
@@ -335,8 +337,9 @@ function applySettings(text) {
   if (loc != null) ROUND_DATES[11] = ROUND_DATES[11].split(" · ")[0] + " · " + loc;
   const pt = get("playoff teams");
   if (pt.length) {
-    PLAYOFF_TEAMS = { default: 6 }; NO_PLAYOFFS = [];
+    PLAYOFF_TEAMS = { default: 6 }; NO_PLAYOFFS = []; PLAYOFF_TBA = [];
     pt.forEach(r => {
+      if (r.d && /tbd|tba|announced/i.test(r.v)) { PLAYOFF_TBA.push(r.d); return; }
       const n = parseInt(r.v, 10) || 0;
       if (!r.d) { if (n > 0) PLAYOFF_TEAMS.default = n; }
       else if (n > 0) PLAYOFF_TEAMS[r.d] = n; else NO_PLAYOFFS.push(r.d);
@@ -536,7 +539,12 @@ function seedPanel(B, d) {
 }
 /* Age-group page: seeds plus a bracket graphic */
 function renderPlayoffAge() {
-  const B = bracket(div), el = document.getElementById("secPlayoffs");
+  const el = document.getElementById("secPlayoffs");
+  if (PLAYOFF_TBA.includes(div)) {
+    el.innerHTML = `<h2>${esc(div)} Playoffs</h2><div class="empty">${esc(div)} playoff seeding and schedule will be posted soon.</div>`;
+    el.dataset.links = "[]"; return;
+  }
+  const B = bracket(div);
   const cols = [], links = [];
   if (B.playin) { cols.push({ title: "Play-in", date: "", games: [["pi", B.playin.m]] }); }
   if (B.rounds[9].length === 1) {
@@ -586,6 +594,7 @@ function renderPlayoffRound() {
   let html = `<h2>${ROUNDS[pround]}<span class="h2date">${esc(ROUND_DATES[pround] || "")}</span></h2>`;
   if (ROUND_EXTRAS[pround]) html += `<div class="pgame extra">${esc(ROUND_EXTRAS[pround])}</div>`;
   for (const d of playoffDivs()) {
+    if (PLAYOFF_TBA.includes(d)) { html += `<div class="round"><h3>${esc(d)}</h3><div class="empty">To be announced.</div></div>`; continue; }
     const B = bracket(d), ms = B.rounds[pround];
     html += `<div class="round"><h3>${esc(d)}</h3>`;
     if (pround === 9 && B.playin) html += `<span class="pnote">Play-in game</span>` + gameCard(B.playin.m, "pgame", null, d);
