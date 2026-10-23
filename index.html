@@ -250,6 +250,9 @@ let PLAYOFF_TBA = ["13U"];
 // 5-team brackets: which two seeds play the first-round game. The winner takes the higher seed's spot,
 // then the semifinals are #1 v #4 and #2 v #3. Default is 4 vs 5.
 let FIRST_ROUND = { "13U": [2, 5] };
+// Reseeding after the first round (#1 plays the lowest seed left). "*" is every division; set a division to false
+// for a fixed bracket (#1 v winner of #4/#5, #2 v winner of #3/#6).
+let RESEED = { "*": true };
 // A round date for one division only, when it differs from the date above.
 let ROUND_DATES_DIV = { 9: { "13U": "Tue, Oct 27" } };
 // Divisions with no bracket can still have playoff-week games (a round-robin bowl). Its name:
@@ -357,6 +360,8 @@ function applySettings(text) {
     const x = get(n + " extra line");
     if (x.length) { const v = x.map(r => r.v).filter(Boolean).join(" · "); if (v) ROUND_EXTRAS[w] = v; else delete ROUND_EXTRAS[w]; }
   });
+  const rs = get("reseed");
+  if (rs.length) { RESEED = { "*": true }; rs.forEach(r => { if (r.v) RESEED[r.d || "*"] = /^(yes|y|on|true)$/i.test(r.v); }); }
   const fr = get("first round matchup");
   if (fr.length) { FIRST_ROUND = {}; fr.forEach(r => { const m = (r.v.match(/\d+/g) || []).map(Number); if (r.d && m.length === 2) FIRST_ROUND[r.d] = m.sort((a, b) => a - b); }); }
   const loc = one("super bowl location");
@@ -519,27 +524,46 @@ function bracket(d) {
     }
     return xs[0] || { seed: n, label: `Seed #${n}` };
   };
-  const rounds = { 9: [], 10: [], 11: [] }; let byes = [], first = null;
+  const rounds = { 9: [], 10: [], 11: [] }; let byes = [], first = null, field = [];
   const seedCount = new Set(S.list.map(x => x.seed)).size;
+  const fixed = !(RESEED[d] ?? RESEED["*"] ?? true);
   if (seedCount >= 6) {
     const a = match(9, s(3), s(6)), b = match(9, s(4), s(5));
     rounds[9] = [a, b]; byes = [s(1), s(2)];
-    rounds[10] = [match(10, s(1), adv(b, "Winner of #4 vs #5")), match(10, s(2), adv(a, "Winner of #3 vs #6"))];
+    if (fixed) rounds[10] = [match(10, s(1), adv(b, "Winner of #4 vs #5")), match(10, s(2), adv(a, "Winner of #3 vs #6"))];
   } else if (seedCount === 5) {
-    // 5 teams: one first-round game (4 v 5 unless FIRST_ROUND says otherwise). Its winner takes the
-    // higher seed's spot, then #1 v #4 and #2 v #3 in the semifinals.
+    // 5 teams: one first-round game (4 v 5 unless FIRST_ROUND says otherwise).
     const [x, y] = FIRST_ROUND[d] || [4, 5];
     const b = match(9, s(x), s(y));
     rounds[9] = [b]; byes = [1, 2, 3, 4, 5].filter(n => n !== x && n !== y).map(s);
-    const slot = n => n === x ? adv(b, `Winner of #${x} vs #${y}`) : s(n);
-    rounds[10] = [match(10, slot(1), slot(4)), match(10, slot(2), slot(3))];
+    if (fixed) { const slot = n => n === x ? adv(b, `Winner of #${x} vs #${y}`) : s(n);
+      rounds[10] = [match(10, slot(1), slot(4)), match(10, slot(2), slot(3))]; }
     first = x;
   } else {
-    rounds[10] = [match(10, s(1), s(4)), match(10, s(2), s(3))];
+    field = [s(1), s(2), s(3), s(4)];
+  }
+  if (!rounds[10].length) {
+    // Reseeding: after the first round, #1 plays the lowest seed left and the other two play each other.
+    // Until every first-round game is decided, show only the teams that are certain for each semifinal.
+    const known = byes.concat(field);
+    const opts = rounds[9].map(m => m.win ? [m.win] : [m.home, m.away]);
+    let combos = [[]];
+    opts.forEach(o => { combos = combos.flatMap(c => o.map(x => c.concat([x]))); });
+    const key = p => p.team || "#" + p.seed;
+    const pairs = combos.map(c => { const f = known.concat(c).sort((p, q) => (p.seed ?? 99) - (q.seed ?? 99)); return [[f[0], f[3]], [f[1], f[2]]]; });
+    rounds[10] = [0, 1].map(k => {
+      const sets = pairs.map(pr => pr[k]);
+      const common = sets[0].filter(p => sets.every(st => st.some(q => key(q) === key(p))));
+      if (common.length >= 2) return match(10, common[0], common[1]);
+      const others = [...new Set(sets.flat().filter(p => !common.some(q => key(q) === key(p))).map(key))].sort();
+      const g = rounds[9].find(m => !m.win && [key(m.home), key(m.away)].sort().join() === others.join());
+      const label = g ? `Winner of #${g.home.seed} vs #${g.away.seed}` : "To be determined";
+      return common.length ? match(10, common[0], { label }) : match(10, { label: "To be determined" }, { label: "To be determined" });
+    });
   }
   const [sf1, sf2] = rounds[10];
   rounds[11] = [match(11, adv(sf1, "Semifinal winner"), adv(sf2, "Semifinal winner"))];
-  return { S, rounds, byes, playin, first, champ: rounds[11][0].win };
+  return { S, rounds, byes, playin, first, reseed: !fixed, champ: rounds[11][0].win };
 }
 function pTeam(p, score, won, lost) {
   const name = p.team ? logo(p.team) + esc(p.team) : `<span class="tbd">${esc(p.label)}</span>`;
@@ -600,12 +624,17 @@ function renderPlayoffAge() {
   if (B.playin) { cols.push({ title: "Play-in", date: "", games: [["pi", B.playin.m]] }); }
   if (B.rounds[9].length === 1) {
     cols.push({ w: 9, games: [["r1b", B.rounds[9][0]]] });
-    links.push(["r1b", B.first === 2 || B.first === 3 ? "sf2" : "sf1"]);
+    if (!B.reseed) links.push(["r1b", B.first === 2 || B.first === 3 ? "sf2" : "sf1"]);
   } else if (B.rounds[9].length) {
     const [a, b] = B.rounds[9];                     // a = #3 v #6, b = #4 v #5
     cols.push({ w: 9, games: B.playin ? [["r1a", a], ["r1b", b]] : [["r1b", b], ["r1a", a]] });
-    links.push(["r1b", "sf1"], ["r1a", "sf2"]);
+    if (!B.reseed) links.push(["r1b", "sf1"], ["r1a", "sf2"]);
     if (B.playin) links.push(["pi", B.playin.seed === 6 || B.playin.seed === 3 ? "r1a" : "r1b"]);
+  }
+  if (B.reseed) {
+    // With reseeding, a first-round game connects to whichever semifinal its winner ends up in.
+    const inSf = (team, k) => [B.rounds[10][k].home, B.rounds[10][k].away].some(p => p.team && p.team === team);
+    cols.forEach(c => c.games.forEach(([id, m]) => { if (/^r1/.test(id) && m.win) [0, 1].forEach(k => { if (inSf(m.win.team, k)) links.push([id, "sf" + (k + 1)]); }); }));
   }
   cols.push({ w: 10, games: [["sf1", B.rounds[10][0]], ["sf2", B.rounds[10][1]]] });
   cols.push({ w: 11, games: [["f", B.rounds[11][0]]] });
@@ -620,6 +649,7 @@ function renderPlayoffAge() {
         <div class="bgames">${c.games.map(([id, m]) => gameCard(m, "bg", id, div)).join("")}</div></div>`).join("")}
       <svg class="blines" aria-hidden="true"></svg>
     </div></div>
+    ${B.reseed && B.rounds[9].length ? `<p class="note">Semifinals are reseeded after the first round: #1 plays the lowest seed left, and the other two teams play each other. An opponent shows once it's decided.</p>` : ""}
     ${B.byes.length ? `<p class="note">First-round byes: ${B.byes.map(b => `#${b.seed} ${esc(b.team || b.label)}`).join(", ")}</p>`
       : `<p class="note">No first-round games. The top 4 teams go straight to the semifinals.</p>`}
     ${B.champ ? `<div class="champ">${esc(div)} Champion: ${esc(B.champ.team)}</div>` : ""}`;
