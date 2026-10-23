@@ -145,6 +145,9 @@ td.pts { font-family: var(--font-display); font-weight: 700; font-size: 18px; co
 body.po-mode header h1 { text-decoration: underline; text-decoration-color: var(--gold); text-decoration-thickness: 6px; text-underline-offset: 7px; margin-bottom: 10px; }
 .champ { background: var(--accent); color: var(--on-accent); border-radius: 10px; padding: 14px 16px; font-family: var(--font-display); font-weight: 700; font-size: 22px; letter-spacing: .03em; text-transform: uppercase; }
 .tag { grid-column: 1 / -1; font-size: 12px; color: var(--accent); font-weight: 600; }
+.bowl .pt { grid-template-columns: 1fr auto; }
+.bowl .pt .seed { display: none; }
+.bowl { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); margin: 12px 0; }
 .empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 14px; color: var(--muted); }
 .filter { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .filter h2 { margin: 0; }
@@ -220,7 +223,7 @@ let SHOW_PLAYOFFS = true;
 const ROUNDS = { 9: "First round", 10: "Semifinals", 11: "Super Bowl" };
 let ROUND_DATES = { 9: "Sat, Oct 24", 10: "Sun, Nov 1", 11: "Sun, Nov 8 (tentative) · Location to be announced" };
 // Shown on a game card until its own row (with time and field) is on the Scores tab.
-let ROUND_INFO = { 10: {
+let ROUND_INFO = { 9: { "13U": "Tue 10/27 · 6:30 PM · at Dighton-Rehoboth" }, 10: {
   "8U": "Sun 11/1 · 11:00 AM · at Dartmouth or Middletown",
   "10U": "Sun 11/1 · 12:30 PM · at Dartmouth or Middletown",
   "12U": "Sun 11/1 · 2:00 PM at Dartmouth or 3:30 PM at Middletown",
@@ -244,6 +247,22 @@ let STANDINGS_NOTES = {
 let PLAYOFF_TEAMS = { "13U": 5, default: 6 };
 // Divisions whose playoff page just says "to be announced" for now.
 let PLAYOFF_TBA = ["13U"];
+// 5-team brackets: which two seeds play the first-round game. The winner takes the higher seed's spot,
+// then the semifinals are #1 v #4 and #2 v #3. Default is 4 vs 5.
+let FIRST_ROUND = { "13U": [2, 5] };
+// A round date for one division only, when it differs from the date above.
+let ROUND_DATES_DIV = { 9: { "13U": "Tue, Oct 27" } };
+// Divisions with no bracket can still have playoff-week games (a round-robin bowl). Its name:
+const BOWL_NAMES = { "6U": "6U Bowl" };
+// Built-in bowl schedule, used until that division has playoff-week rows on the Scores tab. [week, team 1, team 2, note]
+const BOWL_DEFAULT = { "6U": [
+  [10, "Dartmouth", "New Bedford", "Sun 11/1 · 9:00 AM · Field A · at Dartmouth"],
+  [10, "Seekonk", "Edgewood", "Sun 11/1 · 9:00 AM · Field B · at Dartmouth"],
+  [10, "East Providence", "East Bay", "Sun 11/1 · 9:25 AM · Field A · at Dartmouth"],
+  [10, "Dartmouth", "Seekonk", "Sun 11/1 · 9:25 AM · Field B · at Dartmouth"],
+  [10, "New Bedford", "Edgewood", "Sun 11/1 · 9:50 AM · Field A · at Dartmouth"],
+  [10, "East Providence", "Middletown", "Sun 11/1 · 9:50 AM · Field B · at Dartmouth"],
+  [10, "East Bay", "Middletown", "Sun 11/1 · 10:15 AM · Field A · at Dartmouth"] ] };
 let START_VIEW = "playoffs";   // "season" or "playoffs"
 // Teams that are not RISMA members. Their games count for the RISMA team but they get no standings row.
 const NON_MEMBERS = ["Mt. Hope"];
@@ -327,12 +346,16 @@ function applySettings(text) {
   const sp = one("show playoffs"); if (sp != null) SHOW_PLAYOFFS = /^(yes|y|on|true)$/i.test(sp);
   const ov = one("open on"); if (ov != null) START_VIEW = /play/i.test(ov) ? "playoffs" : "season";
   [[9, "first round"], [10, "semifinal"], [11, "super bowl"]].forEach(([w, n]) => {
-    const dt = one(n + " date"); if (dt != null) ROUND_DATES[w] = dt;
+    const ds = get(n + " date");
+    const dt = ds.find(r => !r.d && r.v); if (dt) ROUND_DATES[w] = dt.v;
+    if (ds.some(r => r.d)) { ROUND_DATES_DIV[w] = {}; ds.forEach(r => { if (r.d && r.v) ROUND_DATES_DIV[w][r.d] = r.v; }); }
     const t = get(n + " time");
     if (t.length) { ROUND_INFO[w] = {}; t.forEach(r => { if (r.v) ROUND_INFO[w][r.d || "*"] = r.v; }); }
     const x = get(n + " extra line");
     if (x.length) { const v = x.map(r => r.v).filter(Boolean).join(" · "); if (v) ROUND_EXTRAS[w] = v; else delete ROUND_EXTRAS[w]; }
   });
+  const fr = get("first round matchup");
+  if (fr.length) { FIRST_ROUND = {}; fr.forEach(r => { const m = (r.v.match(/\d+/g) || []).map(Number); if (r.d && m.length === 2) FIRST_ROUND[r.d] = m.sort((a, b) => a - b); }); }
   const loc = one("super bowl location");
   if (loc != null) ROUND_DATES[11] = ROUND_DATES[11].split(" · ")[0] + " · " + loc;
   const pt = get("playoff teams");
@@ -451,7 +474,8 @@ function renderGames() {
   document.getElementById("games").innerHTML = html + (byes ? `<p class="note">Bye: ${byes.map(esc).join(", ")}</p>` : "");
 }
 /* ===== Playoffs ===== */
-const playoffDivs = () => D.divs.filter(d => !NO_PLAYOFFS.includes(d));
+const isBowl = d => NO_PLAYOFFS.includes(d) && (D.playoffs[d] || []).length > 0;
+const playoffDivs = () => D.divs.filter(d => !NO_PLAYOFFS.includes(d) || isBowl(d));
 function seedsFor(d) {
   if (D.seeds[d]?.length) return { list: D.seeds[d], projected: false };
   const n = PLAYOFF_TEAMS[d] ?? PLAYOFF_TEAMS.default;
@@ -488,23 +512,27 @@ function bracket(d) {
     }
     return xs[0] || { seed: n, label: `Seed #${n}` };
   };
-  const rounds = { 9: [], 10: [], 11: [] }; let byes = [];
+  const rounds = { 9: [], 10: [], 11: [] }; let byes = [], first = null;
   const seedCount = new Set(S.list.map(x => x.seed)).size;
   if (seedCount >= 6) {
     const a = match(9, s(3), s(6)), b = match(9, s(4), s(5));
     rounds[9] = [a, b]; byes = [s(1), s(2)];
     rounds[10] = [match(10, s(1), adv(b, "Winner of #4 vs #5")), match(10, s(2), adv(a, "Winner of #3 vs #6"))];
   } else if (seedCount === 5) {
-    // 5 teams: #4 v #5 in the first round, #1 plays that winner, #2 v #3 in the other semifinal.
-    const b = match(9, s(4), s(5));
-    rounds[9] = [b]; byes = [s(1), s(2), s(3)];
-    rounds[10] = [match(10, s(1), adv(b, "Winner of #4 vs #5")), match(10, s(2), s(3))];
+    // 5 teams: one first-round game (4 v 5 unless FIRST_ROUND says otherwise). Its winner takes the
+    // higher seed's spot, then #1 v #4 and #2 v #3 in the semifinals.
+    const [x, y] = FIRST_ROUND[d] || [4, 5];
+    const b = match(9, s(x), s(y));
+    rounds[9] = [b]; byes = [1, 2, 3, 4, 5].filter(n => n !== x && n !== y).map(s);
+    const slot = n => n === x ? adv(b, `Winner of #${x} vs #${y}`) : s(n);
+    rounds[10] = [match(10, slot(1), slot(4)), match(10, slot(2), slot(3))];
+    first = x;
   } else {
     rounds[10] = [match(10, s(1), s(4)), match(10, s(2), s(3))];
   }
   const [sf1, sf2] = rounds[10];
   rounds[11] = [match(11, adv(sf1, "Semifinal winner"), adv(sf2, "Semifinal winner"))];
-  return { S, rounds, byes, playin, champ: rounds[11][0].win };
+  return { S, rounds, byes, playin, first, champ: rounds[11][0].win };
 }
 function pTeam(p, score, won, lost) {
   const name = p.team ? logo(p.team) + esc(p.team) : `<span class="tbd">${esc(p.label)}</span>`;
@@ -538,8 +566,24 @@ function seedPanel(B, d) {
     </div>`;
 }
 /* Age-group page: seeds plus a bracket graphic */
+function bowlCards(d, w) {
+  return (D.playoffs[d] || []).filter(g => w == null || g.w === w).map(g => {
+    const scored = g.sa != null && g.sb != null, home = { team: g.a }, away = { team: g.b };
+    const win = scored && g.sa !== g.sb ? (g.sa > g.sb ? home : away) : null;
+    return gameCard({ w: g.w, home, away, hs: scored ? g.sa : null, as: scored ? g.sb : null, win, note: g.note, ff: g.ff }, "pgame", null, d);
+  }).join("");
+}
 function renderPlayoffAge() {
   const el = document.getElementById("secPlayoffs");
+  if (isBowl(div)) {
+    const ws = [...new Set(D.playoffs[div].map(g => g.w))];
+    el.innerHTML = `<h2>${esc(BOWL_NAMES[div] || div + " Bowl")}</h2>
+      ${ws.map(w => ROUND_EXTRAS[w] && /bowl/i.test(ROUND_EXTRAS[w]) ? `<p class="note">${esc(ROUND_EXTRAS[w])}</p>` : "").join("")}
+      <p class="note">Round robin: every team plays two games.</p>
+      <div class="bowl">${bowlCards(div)}</div>
+      ${SEED_NOTES[div] ? `<p class="note"><strong>${esc(SEED_NOTES[div])}</strong></p>` : ""}`;
+    el.dataset.links = "[]"; return;
+  }
   if (PLAYOFF_TBA.includes(div)) {
     el.innerHTML = `<h2>${esc(div)} Playoffs</h2><div class="empty">${esc(div)} playoff seeding and schedule will be posted soon.</div>`;
     el.dataset.links = "[]"; return;
@@ -549,7 +593,7 @@ function renderPlayoffAge() {
   if (B.playin) { cols.push({ title: "Play-in", date: "", games: [["pi", B.playin.m]] }); }
   if (B.rounds[9].length === 1) {
     cols.push({ w: 9, games: [["r1b", B.rounds[9][0]]] });
-    links.push(["r1b", "sf1"]);
+    links.push(["r1b", B.first === 2 || B.first === 3 ? "sf2" : "sf1"]);
   } else if (B.rounds[9].length) {
     const [a, b] = B.rounds[9];                     // a = #3 v #6, b = #4 v #5
     cols.push({ w: 9, games: B.playin ? [["r1a", a], ["r1b", b]] : [["r1b", b], ["r1a", a]] });
@@ -565,7 +609,7 @@ function renderPlayoffAge() {
     <h3 class="sechead">Games</h3>
     <p class="swipe">Swipe the bracket sideways to see every round →</p>
     <div class="bwrap"><div class="bracket" id="bracket" style="--cols: ${cols.length}">
-      ${cols.map(c => `<div class="bcol"><div class="bhead">${c.title || ROUNDS[c.w]}<span>${esc(c.date ?? ROUND_DATES[c.w] ?? "")}</span></div>
+      ${cols.map(c => `<div class="bcol"><div class="bhead">${c.title || ROUNDS[c.w]}<span>${esc(c.date ?? ROUND_DATES_DIV[c.w]?.[div] ?? ROUND_DATES[c.w] ?? "")}</span></div>
         <div class="bgames">${c.games.map(([id, m]) => gameCard(m, "bg", id, div)).join("")}</div></div>`).join("")}
       <svg class="blines" aria-hidden="true"></svg>
     </div></div>
@@ -595,6 +639,7 @@ function renderPlayoffRound() {
   if (ROUND_EXTRAS[pround]) html += `<div class="pgame extra">${esc(ROUND_EXTRAS[pround])}</div>`;
   for (const d of playoffDivs()) {
     if (PLAYOFF_TBA.includes(d)) { html += `<div class="round"><h3>${esc(d)}</h3><div class="empty">To be announced.</div></div>`; continue; }
+    if (isBowl(d)) { const c = bowlCards(d, pround); if (c) html += `<div class="round"><h3>${esc(BOWL_NAMES[d] || d + " Bowl")}</h3>${c}</div>`; continue; }
     const B = bracket(d), ms = B.rounds[pround];
     html += `<div class="round"><h3>${esc(d)}</h3>`;
     if (pround === 9 && B.playin) html += `<span class="pnote">Play-in game</span>` + gameCard(B.playin.m, "pgame", null, d);
@@ -639,12 +684,14 @@ function renderAll() {
 
 function start(scoresText, adjText, label, seedsText) {
   D = build(scoresText, adjText, seedsText);
+  for (const d in BOWL_DEFAULT) if (D.divs.includes(d) && !(D.playoffs[d] || []).length)
+    D.playoffs[d] = BOWL_DEFAULT[d].map(([w, a, b, note]) => ({ w, a, sa: null, b, sb: null, ff: "", note }));
   mode = SHOW_PLAYOFFS ? START_VIEW : "season";
   if (!D.divs.length) { document.getElementById("updated").textContent = "No scores yet."; return; }
   lastWeek = Math.max(...D.divs.flatMap(d => D.games[d].map(g => g.w)));
   week = lastWeek;
   let saved = null; try { saved = localStorage.getItem("risma-div"); } catch (e) {}
-  div = D.divs.includes(saved) ? saved : D.divs[0];
+  div = D.divs.includes(saved) ? saved : mode === "playoffs" ? (playoffDivs().find(d => !isBowl(d)) || D.divs[0]) : D.divs[0];
   const total = D.divs.reduce((n, d) => n + D.games[d].length, 0);
   seasonLabel = `Final standings through Week ${lastWeek} · ${total} games across ${D.divs.length} divisions${label ? " · " + label : ""}`;
   renderAll();
