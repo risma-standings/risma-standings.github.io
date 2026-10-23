@@ -254,6 +254,9 @@ let FIRST_ROUND = { "13U": [2, 5] };
 let ROUND_DATES_DIV = { 9: { "13U": "Tue, Oct 27" } };
 // Divisions with no bracket can still have playoff-week games (a round-robin bowl). Its name:
 const BOWL_NAMES = { "6U": "6U Bowl" };
+// Projected seeds still waiting on a regular-season game. They get a † until that game has a score.
+const PENDING_SEEDS = { "13U": { seeds: [3, 4], game: ["East Providence", "East Bay"],
+  note: "Depends on Saturday's make-up game, East Providence at East Bay" } };
 // Built-in bowl schedule, used until that division has playoff-week rows on the Scores tab. [week, team 1, team 2, note]
 const BOWL_DEFAULT = { "6U": [
   [10, "Dartmouth", "New Bedford", "Sun 11/1 · 9:00 AM · Field A · at Dartmouth"],
@@ -479,7 +482,11 @@ const playoffDivs = () => D.divs.filter(d => !NO_PLAYOFFS.includes(d) || isBowl(
 function seedsFor(d) {
   if (D.seeds[d]?.length) return { list: D.seeds[d], projected: false };
   const n = PLAYOFF_TEAMS[d] ?? PLAYOFF_TEAMS.default;
-  return { list: standings(d).slice(0, n).map((r, i) => ({ seed: i + 1, team: r.k, note: r.coin ? "Tied, coin flip decides" : "" })), projected: true };
+  const list = standings(d).slice(0, n).map((r, i) => ({ seed: i + 1, team: r.k, note: r.coin ? "Tied, coin flip decides" : "" }));
+  const p = PENDING_SEEDS[d], [x, y] = p ? p.game : [];
+  if (p && !D.games[d].some(g => (g.a === x && g.b === y) || (g.a === y && g.b === x)))
+    list.forEach(s => { if (p.seeds.includes(s.seed)) s.note = p.note; });
+  return { list, projected: true };
 }
 function bracket(d) {
   const S = seedsFor(d), rows = D.playoffs[d] || [];
