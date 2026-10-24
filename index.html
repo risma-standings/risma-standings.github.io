@@ -635,7 +635,11 @@ function renderPlayoffAge() {
   if (B.reseed) {
     // With reseeding, a first-round game connects to whichever semifinal its winner ends up in.
     const inSf = (team, k) => [B.rounds[10][k].home, B.rounds[10][k].away].some(p => p.team && p.team === team);
-    cols.forEach(c => c.games.forEach(([id, m]) => { if (/^r1/.test(id) && m.win) [0, 1].forEach(k => { if (inSf(m.win.team, k)) links.push([id, "sf" + (k + 1)]); }); }));
+    const dest = {};
+    cols.forEach(c => c.games.forEach(([id, m]) => { if (/^r1/.test(id) && m.win) [0, 1].forEach(k => { if (inSf(m.win.team, k)) { links.push([id, "sf" + (k + 1)]); dest[id] = k; } }); }));
+    // Put each first-round game beside the semifinal its winner plays in, so the lines never cross.
+    const r1 = cols.find(c => c.w === 9);
+    if (r1 && r1.games.length === 2 && r1.games.every(([id]) => id in dest) && dest[r1.games[0][0]] > dest[r1.games[1][0]]) r1.games.reverse();
   }
   cols.push({ w: 10, games: [["sf1", B.rounds[10][0]], ["sf2", B.rounds[10][1]]] });
   cols.push({ w: 11, games: [["f", B.rounds[11][0]]] });
@@ -666,6 +670,8 @@ function drawLines() {
   svg.innerHTML = JSON.parse(el.dataset.links || "[]").map(([f, t]) => {
     const a = pos(f), b = pos(t); if (!a || !b) return "";
     const x = (a.r + b.l) / 2;
+    // Nearly level cards get a straight line instead of a tiny step.
+    if (Math.abs(a.y - b.y) < 16) return `<path d="M${a.r} ${a.y} H${b.l}" />`;
     return `<path d="M${a.r} ${a.y} H${x} V${b.y} H${b.l}" />`;
   }).join("");
 }
