@@ -547,8 +547,16 @@ function bracket(d) {
     // Until every first-round game is decided, only #1 and #2 (when they have byes) are shown; the rest is TBD.
     const known = byes.concat(field), TBD = { label: "TBD" };
     if (rounds[9].some(m => !m.win)) {
+      // A semifinal shows both teams only when it's the same matchup whatever the remaining games do.
       const top = n => known.find(p => p.seed === n && p.team) || TBD;
-      rounds[10] = [match(10, top(1), TBD), match(10, top(2), TBD)];
+      let combos = [[]];
+      rounds[9].map(m => m.win ? [m.win] : [m.home, m.away]).forEach(o => { combos = combos.flatMap(c => o.map(x => c.concat([x]))); });
+      const pairs = combos.map(c => { const f = known.concat(c).sort((p, q) => (p.seed ?? 99) - (q.seed ?? 99)); return [[f[0], f[3]], [f[1], f[2]]]; });
+      const id = pr => pr.every(p => p && p.team) ? pr.map(p => p.team).sort().join("|") : null;
+      rounds[10] = [0, 1].map(k => {
+        const first = id(pairs[0][k]);
+        return first && pairs.every(pr => id(pr[k]) === first) ? match(10, pairs[0][k][0], pairs[0][k][1]) : match(10, top(k + 1), TBD);
+      });
     } else {
       const f = known.concat(rounds[9].map(m => m.win)).sort((p, q) => (p.seed ?? 99) - (q.seed ?? 99));
       rounds[10] = [match(10, f[0], f[3]), match(10, f[1], f[2])];
@@ -642,7 +650,7 @@ function renderPlayoffAge() {
         <div class="bgames">${c.games.map(([id, m]) => gameCard(m, "bg", id, div)).join("")}</div></div>`).join("")}
       <svg class="blines" aria-hidden="true"></svg>
     </div></div>
-    ${B.reseed && B.rounds[9].length ? `<p class="note">Semifinals are reseeded after the first round: the top team left plays the lowest team left, and the other two play each other. Matchups fill in once the first round is over.</p>` : ""}
+    ${B.reseed && B.rounds[9].length ? `<p class="note">Semifinals are reseeded after the first round: the top team left plays the lowest team left, and the other two play each other. A matchup shows as soon as it's certain.</p>` : ""}
     ${B.byes.length ? `<p class="note">First-round byes: ${B.byes.map(b => `#${b.seed} ${esc(b.team || b.label)}`).join(", ")}</p>`
       : `<p class="note">No first-round games. The top 4 teams go straight to the semifinals.</p>`}
     ${B.champ ? `<div class="champ">${esc(div)} Champion: ${esc(B.champ.team)}</div>` : ""}`;
